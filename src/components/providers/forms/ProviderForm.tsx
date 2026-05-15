@@ -1885,7 +1885,9 @@ function ProviderFormFull({
               isPartner={isCodexPartner}
               partnerPromotionKey={codexPartnerPromotionKey}
               hideApiKey={isCodexCopilotProvider}
-              shouldShowSpeedTest={shouldShowSpeedTest && !isCodexCopilotProvider}
+              shouldShowSpeedTest={
+                shouldShowSpeedTest && !isCodexCopilotProvider
+              }
               codexBaseUrl={codexBaseUrl}
               onBaseUrlChange={handleCodexBaseUrlChange}
               isFullUrl={localIsFullUrl}
