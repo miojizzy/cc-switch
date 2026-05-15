@@ -509,6 +509,12 @@ function ProviderFormFull({
     return (entry?.preset as CodexProviderPreset | undefined)?.providerType;
   }, [appId, presetEntries, selectedPresetId]);
 
+  // Codex GitHub Copilot 供应商检测（新建时从预设获取，编辑时从现有数据获取）
+  const isCodexCopilotProvider =
+    appId === "codex" &&
+    (codexPresetProviderType === "github_copilot" ||
+      initialData?.meta?.providerType === "github_copilot");
+
   const {
     templateValues,
     templateValueEntries,
@@ -928,7 +934,7 @@ function ProviderFormFull({
     const isCopilotProvider =
       templatePreset?.providerType === "github_copilot" ||
       initialData?.meta?.providerType === "github_copilot" ||
-      codexPresetProviderType === "github_copilot" ||
+      isCodexCopilotProvider ||
       baseUrl.includes("githubcopilot.com");
     const isCodexOauthProvider =
       templatePreset?.providerType === "codex_oauth" ||
@@ -1047,7 +1053,7 @@ function ProviderFormFull({
     const isCopilotProvider =
       templatePreset?.providerType === "github_copilot" ||
       initialData?.meta?.providerType === "github_copilot" ||
-      codexPresetProviderType === "github_copilot" ||
+      isCodexCopilotProvider ||
       baseUrl.includes("githubcopilot.com");
     const isCodexOauthProvider =
       templatePreset?.providerType === "codex_oauth" ||
@@ -1194,7 +1200,7 @@ function ProviderFormFull({
     // 确定 providerType（新建时从预设获取，编辑时从现有数据获取）
     const providerType =
       templatePreset?.providerType ||
-      codexPresetProviderType ||
+      (isCodexCopilotProvider ? "github_copilot" : undefined) ||
       initialData?.meta?.providerType;
 
     const nextMeta: ProviderMeta = {
@@ -1861,14 +1867,12 @@ function ProviderFormFull({
             />
           )}
 
-          {appId === "codex" &&
-            (codexPresetProviderType === "github_copilot" ||
-              initialData?.meta?.providerType === "github_copilot") && (
-              <CopilotAuthSection
-                selectedAccountId={selectedGitHubAccountId}
-                onAccountSelect={setSelectedGitHubAccountId}
-              />
-            )}
+          {appId === "codex" && isCodexCopilotProvider && (
+            <CopilotAuthSection
+              selectedAccountId={selectedGitHubAccountId}
+              onAccountSelect={setSelectedGitHubAccountId}
+            />
+          )}
 
           {appId === "codex" && (
             <CodexFormFields
@@ -1880,15 +1884,8 @@ function ProviderFormFull({
               websiteUrl={codexWebsiteUrl}
               isPartner={isCodexPartner}
               partnerPromotionKey={codexPartnerPromotionKey}
-              hideApiKey={
-                codexPresetProviderType === "github_copilot" ||
-                initialData?.meta?.providerType === "github_copilot"
-              }
-              shouldShowSpeedTest={
-                shouldShowSpeedTest &&
-                codexPresetProviderType !== "github_copilot" &&
-                initialData?.meta?.providerType !== "github_copilot"
-              }
+              hideApiKey={isCodexCopilotProvider}
+              shouldShowSpeedTest={shouldShowSpeedTest && !isCodexCopilotProvider}
               codexBaseUrl={codexBaseUrl}
               onBaseUrlChange={handleCodexBaseUrlChange}
               isFullUrl={localIsFullUrl}
