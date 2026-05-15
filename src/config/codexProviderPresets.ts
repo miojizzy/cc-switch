@@ -24,6 +24,9 @@ export interface CodexProviderPreset {
   // 图标配置
   icon?: string; // 图标名称
   iconColor?: string; // 图标颜色
+  // OAuth 供应商标识
+  providerType?: string; // 供应商类型（如 "github_copilot"）
+  requiresOAuth?: boolean; // 是否需要 OAuth 认证
 }
 
 /**
@@ -121,6 +124,26 @@ requires_openai_auth = true`,
     },
     icon: "azure",
     iconColor: "#0078D4",
+  },
+  {
+    name: "GitHub Copilot",
+    websiteUrl: "https://github.com/features/copilot",
+    category: "third_party",
+    providerType: "github_copilot",
+    requiresOAuth: true,
+    auth: { OPENAI_API_KEY: "" },
+    config: `model_provider = "github-copilot"
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+disable_response_storage = true
+
+[model_providers.github-copilot]
+name = "GitHub Copilot"
+base_url = "http://127.0.0.1:15721"
+wire_api = "responses"
+requires_openai_auth = true`,
+    icon: "github",
+    iconColor: "#000000",
   },
   {
     name: "AiHubMix",

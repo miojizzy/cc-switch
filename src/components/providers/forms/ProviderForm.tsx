@@ -62,6 +62,7 @@ import { BasicFormFields } from "./BasicFormFields";
 import { ClaudeFormFields } from "./ClaudeFormFields";
 import { ClaudeDesktopProviderForm } from "./ClaudeDesktopProviderForm";
 import { CodexFormFields } from "./CodexFormFields";
+import { CopilotAuthSection } from "./CopilotAuthSection";
 import { GeminiFormFields } from "./GeminiFormFields";
 import { OmoFormFields } from "./OmoFormFields";
 import { parseOmoOtherFieldsObject } from "@/types/omo";
@@ -501,6 +502,13 @@ function ProviderFormFull({
       }));
   }, [appId]);
 
+  // 获取当前选中的 Codex 预设的 providerType（用于检测 GitHub Copilot 等 OAuth 供应商）
+  const codexPresetProviderType = useMemo(() => {
+    if (appId !== "codex") return undefined;
+    const entry = presetEntries.find((e) => e.id === selectedPresetId);
+    return (entry?.preset as CodexProviderPreset | undefined)?.providerType;
+  }, [appId, presetEntries, selectedPresetId]);
+
   const {
     templateValues,
     templateValueEntries,
@@ -920,6 +928,7 @@ function ProviderFormFull({
     const isCopilotProvider =
       templatePreset?.providerType === "github_copilot" ||
       initialData?.meta?.providerType === "github_copilot" ||
+      codexPresetProviderType === "github_copilot" ||
       baseUrl.includes("githubcopilot.com");
     const isCodexOauthProvider =
       templatePreset?.providerType === "codex_oauth" ||
@@ -1038,6 +1047,7 @@ function ProviderFormFull({
     const isCopilotProvider =
       templatePreset?.providerType === "github_copilot" ||
       initialData?.meta?.providerType === "github_copilot" ||
+      codexPresetProviderType === "github_copilot" ||
       baseUrl.includes("githubcopilot.com");
     const isCodexOauthProvider =
       templatePreset?.providerType === "codex_oauth" ||
@@ -1183,7 +1193,9 @@ function ProviderFormFull({
 
     // 确定 providerType（新建时从预设获取，编辑时从现有数据获取）
     const providerType =
-      templatePreset?.providerType || initialData?.meta?.providerType;
+      templatePreset?.providerType ||
+      codexPresetProviderType ||
+      initialData?.meta?.providerType;
 
     const nextMeta: ProviderMeta = {
       ...(baseMeta ?? {}),
@@ -1849,6 +1861,15 @@ function ProviderFormFull({
             />
           )}
 
+          {appId === "codex" &&
+            (codexPresetProviderType === "github_copilot" ||
+              initialData?.meta?.providerType === "github_copilot") && (
+              <CopilotAuthSection
+                selectedAccountId={selectedGitHubAccountId}
+                onAccountSelect={setSelectedGitHubAccountId}
+              />
+            )}
+
           {appId === "codex" && (
             <CodexFormFields
               providerId={providerId}
@@ -1859,7 +1880,15 @@ function ProviderFormFull({
               websiteUrl={codexWebsiteUrl}
               isPartner={isCodexPartner}
               partnerPromotionKey={codexPartnerPromotionKey}
-              shouldShowSpeedTest={shouldShowSpeedTest}
+              hideApiKey={
+                codexPresetProviderType === "github_copilot" ||
+                initialData?.meta?.providerType === "github_copilot"
+              }
+              shouldShowSpeedTest={
+                shouldShowSpeedTest &&
+                codexPresetProviderType !== "github_copilot" &&
+                initialData?.meta?.providerType !== "github_copilot"
+              }
               codexBaseUrl={codexBaseUrl}
               onBaseUrlChange={handleCodexBaseUrlChange}
               isFullUrl={localIsFullUrl}
