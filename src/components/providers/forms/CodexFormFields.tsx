@@ -26,6 +26,7 @@ interface CodexFormFieldsProps {
   websiteUrl: string;
   isPartner?: boolean;
   partnerPromotionKey?: string;
+  hideApiKey?: boolean; // 用于 OAuth 供应商（如 GitHub Copilot），不展示 API Key 输入框
 
   // Base URL
   shouldShowSpeedTest: boolean;
@@ -57,6 +58,7 @@ export function CodexFormFields({
   websiteUrl,
   isPartner,
   partnerPromotionKey,
+  hideApiKey = false,
   shouldShowSpeedTest,
   codexBaseUrl,
   onBaseUrlChange,
@@ -106,26 +108,28 @@ export function CodexFormFields({
 
   return (
     <>
-      {/* Codex API Key 输入框 */}
-      <ApiKeySection
-        id="codexApiKey"
-        label="API Key"
-        value={codexApiKey}
-        onChange={onApiKeyChange}
-        category={category}
-        shouldShowLink={shouldShowApiKeyLink}
-        websiteUrl={websiteUrl}
-        isPartner={isPartner}
-        partnerPromotionKey={partnerPromotionKey}
-        placeholder={{
-          official: t("providerForm.codexOfficialNoApiKey", {
-            defaultValue: "官方供应商无需 API Key",
-          }),
-          thirdParty: t("providerForm.codexApiKeyAutoFill", {
-            defaultValue: "输入 API Key，将自动填充到配置",
-          }),
-        }}
-      />
+      {/* Codex API Key 输入框（OAuth 供应商如 GitHub Copilot 不显示）*/}
+      {!hideApiKey && (
+        <ApiKeySection
+          id="codexApiKey"
+          label="API Key"
+          value={codexApiKey}
+          onChange={onApiKeyChange}
+          category={category}
+          shouldShowLink={shouldShowApiKeyLink}
+          websiteUrl={websiteUrl}
+          isPartner={isPartner}
+          partnerPromotionKey={partnerPromotionKey}
+          placeholder={{
+            official: t("providerForm.codexOfficialNoApiKey", {
+              defaultValue: "官方供应商无需 API Key",
+            }),
+            thirdParty: t("providerForm.codexApiKeyAutoFill", {
+              defaultValue: "输入 API Key，将自动填充到配置",
+            }),
+          }}
+        />
+      )}
 
       {/* Codex Base URL 输入框 */}
       {shouldShowSpeedTest && (

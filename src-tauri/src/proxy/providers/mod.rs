@@ -158,7 +158,15 @@ impl ProviderType {
                 }
                 ProviderType::Claude
             }
-            AppType::Codex => ProviderType::Codex,
+            AppType::Codex => {
+                // 检测是否为 GitHub Copilot
+                if let Some(meta) = provider.meta.as_ref() {
+                    if meta.provider_type.as_deref() == Some("github_copilot") {
+                        return ProviderType::GitHubCopilot;
+                    }
+                }
+                ProviderType::Codex
+            }
             AppType::Gemini => {
                 // 检测是否为 CLI 模式（OAuth）
                 let adapter = GeminiAdapter::new();
@@ -444,6 +452,23 @@ mod tests {
 
         let provider_type = ProviderType::from_app_type_and_config(&AppType::Codex, &provider);
         assert_eq!(provider_type, ProviderType::Codex);
+    }
+
+    #[test]
+    fn test_from_app_type_codex_github_copilot() {
+        use crate::provider::ProviderMeta;
+        let mut provider = create_provider(json!({
+            "auth": {
+                "OPENAI_API_KEY": ""
+            }
+        }));
+        provider.meta = Some(ProviderMeta {
+            provider_type: Some("github_copilot".to_string()),
+            ..Default::default()
+        });
+
+        let provider_type = ProviderType::from_app_type_and_config(&AppType::Codex, &provider);
+        assert_eq!(provider_type, ProviderType::GitHubCopilot);
     }
 
     #[test]

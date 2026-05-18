@@ -32,6 +32,15 @@ impl CodexAdapter {
         CODEX_CLIENT_REGEX.is_match(user_agent)
     }
 
+    /// 检测是否为 GitHub Copilot 供应商
+    fn is_github_copilot(&self, provider: &Provider) -> bool {
+        provider
+            .meta
+            .as_ref()
+            .and_then(|m| m.provider_type.as_deref())
+            == Some("github_copilot")
+    }
+
     /// 从 Provider 配置中提取 API Key
     fn extract_key(&self, provider: &Provider) -> Option<String> {
         // 1. 尝试从 env 中获取
@@ -85,6 +94,11 @@ impl ProviderAdapter for CodexAdapter {
     }
 
     fn extract_base_url(&self, provider: &Provider) -> Result<String, ProxyError> {
+        // GitHub Copilot 使用统一的 API 端点
+        if self.is_github_copilot(provider) {
+            return Ok("https://api.githubcopilot.com".to_string());
+        }
+
         // 1. 尝试直接获取 base_url 字段
         if let Some(url) = provider
             .settings_config
@@ -132,6 +146,13 @@ impl ProviderAdapter for CodexAdapter {
     }
 
     fn extract_auth(&self, provider: &Provider) -> Option<AuthInfo> {
+        // GitHub Copilot 使用 OAuth token（由 forwarder 动态注入真实 token）
+        if self.is_github_copilot(provider) {
+            return Some(AuthInfo::new(
+                "copilot_placeholder".to_string(),
+                AuthStrategy::GitHubCopilot,
+            ));
+        }
         self.extract_key(provider)
             .map(|key| AuthInfo::new(key, AuthStrategy::Bearer))
     }
@@ -179,6 +200,61 @@ impl ProviderAdapter for CodexAdapter {
     ) -> Result<Vec<(http::HeaderName, http::HeaderValue)>, ProxyError> {
         use super::adapter::auth_header_value;
         let bearer = format!("Bearer {}", auth.api_key);
+
+        if auth.strategy == AuthStrategy::GitHubCopilot {
+            let request_id = uuid::Uuid::new_v4().to_string();
+            return Ok(vec![
+                (
+                    http::HeaderName::from_static("authorization"),
+                    auth_header_value(&bearer)?,
+                ),
+                (
+                    http::HeaderName::from_static("editor-version"),
+                    http::HeaderValue::from_static(super::copilot_auth::COPILOT_EDITOR_VERSION),
+                ),
+                (
+                    http::HeaderName::from_static("editor-plugin-version"),
+                    http::HeaderValue::from_static(super::copilot_auth::COPILOT_PLUGIN_VERSION),
+                ),
+                (
+                    http::HeaderName::from_static("copilot-integration-id"),
+                    http::HeaderValue::from_static(super::copilot_auth::COPILOT_INTEGRATION_ID),
+                ),
+                (
+                    http::HeaderName::from_static("user-agent"),
+                    http::HeaderValue::from_static(super::copilot_auth::COPILOT_USER_AGENT),
+                ),
+                (
+                    http::HeaderName::from_static("x-github-api-version"),
+                    http::HeaderValue::from_static(super::copilot_auth::COPILOT_API_VERSION),
+                ),
+                (
+                    http::HeaderName::from_static("openai-intent"),
+                    http::HeaderValue::from_static("conversation-agent"),
+                ),
+                (
+                    http::HeaderName::from_static("x-initiator"),
+                    http::HeaderValue::from_static("user"),
+                ),
+                (
+                    http::HeaderName::from_static("x-interaction-type"),
+                    http::HeaderValue::from_static("conversation-agent"),
+                ),
+                (
+                    http::HeaderName::from_static("x-vscode-user-agent-library-version"),
+                    http::HeaderValue::from_static("electron-fetch"),
+                ),
+                (
+                    http::HeaderName::from_static("x-request-id"),
+                    auth_header_value(&request_id)?,
+                ),
+                (
+                    http::HeaderName::from_static("x-agent-task-id"),
+                    auth_header_value(&request_id)?,
+                ),
+            ]);
+        }
+
         Ok(vec![(
             http::HeaderName::from_static("authorization"),
             auth_header_value(&bearer)?,
@@ -305,5 +381,66 @@ mod tests {
         assert!(!CodexAdapter::is_official_client(
             "prefix_codex_cli_rs/1.0.0"
         ));
+    }
+
+    fn create_provider_with_meta(
+        config: serde_json::Value,
+        meta: crate::provider::ProviderMeta,
+    ) -> Provider {
+        Provider {
+            id: "test".to_string(),
+            name: "Test Codex".to_string(),
+            settings_config: config,
+            website_url: None,
+            category: Some("codex".to_string()),
+            created_at: None,
+            sort_index: None,
+            notes: None,
+            meta: Some(meta),
+            icon: None,
+            icon_color: None,
+            in_failover_queue: false,
+        }
+    }
+
+    #[test]
+    fn test_github_copilot_extract_base_url() {
+        let adapter = CodexAdapter::new();
+        let meta = crate::provider::ProviderMeta {
+            provider_type: Some("github_copilot".to_string()),
+            ..Default::default()
+        };
+        let provider = create_provider_with_meta(
+            serde_json::json!({ "auth": { "OPENAI_API_KEY": "" } }),
+            meta,
+        );
+
+        let url = adapter.extract_base_url(&provider).unwrap();
+        assert_eq!(url, "https://api.githubcopilot.com");
+    }
+
+    #[test]
+    fn test_github_copilot_extract_auth() {
+        let adapter = CodexAdapter::new();
+        let meta = crate::provider::ProviderMeta {
+            provider_type: Some("github_copilot".to_string()),
+            ..Default::default()
+        };
+        let provider = create_provider_with_meta(
+            serde_json::json!({ "auth": { "OPENAI_API_KEY": "" } }),
+            meta,
+        );
+
+        let auth = adapter.extract_auth(&provider).unwrap();
+        assert_eq!(auth.api_key, "copilot_placeholder");
+        assert_eq!(auth.strategy, AuthStrategy::GitHubCopilot);
+    }
+
+    #[test]
+    fn test_github_copilot_build_url() {
+        let adapter = CodexAdapter::new();
+        // GitHub Copilot base_url is a plain origin → /v1 should be added
+        let url = adapter.build_url("https://api.githubcopilot.com", "/v1/responses");
+        assert_eq!(url, "https://api.githubcopilot.com/v1/responses");
     }
 }
